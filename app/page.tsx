@@ -1,13 +1,17 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { Streamdown } from 'streamdown';
-import { useState, useRef, useEffect, Suspense  } from 'react';
+import { useRef, useEffect, Suspense } from 'react';
+import { generateLongHistory } from '@/lib/mockData';
+import { StreamingMessage } from '@/components/StreamingMessage';
 
 function ChatContent() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop } = useChat({
     api: '/api/chat',
+    initialMessages: generateLongHistory(50),
+    experimental_throttle: 50,
   });
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,7 +25,7 @@ function ChatContent() {
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
+        {messages.map((message, index) => (
           <div
             key={message.id}
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -31,9 +35,10 @@ function ChatContent() {
                 message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100'
               }`}
             >
-              {message.parts
-                ?.filter((p) => p.type === 'text')
-                .map((p, i) => <Streamdown key={i}>{p.text}</Streamdown>)}
+              <StreamingMessage
+                content={message.content}
+                isStreaming={isLoading && index === messages.length - 1}
+              />
             </div>
           </div>
         ))}
@@ -70,7 +75,7 @@ function ChatContent() {
 
 export default function Chat() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center h-screen">正在加载助手...</div>}>
+    <Suspense fallback={<div className="p-4">加载中...</div>}>
       <ChatContent />
     </Suspense>
   );
