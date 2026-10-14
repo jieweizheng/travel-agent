@@ -1,15 +1,45 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { useRef, useEffect, Suspense } from 'react';
-import { generateLongHistory } from '@/lib/mockData';
+import { useRef, useEffect, useState, Suspense } from 'react';
 import { StreamingMessage } from '@/components/StreamingMessage';
+import { ToolCallCard } from '@/components/ToolCallCard';
+import { ThinkingCard } from '@/components/ThinkingCard';
+
+interface MockOption {
+  name: string;
+  input: string;
+}
 
 function ChatContent() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, stop } = useChat({
+  const [mockName, setMockName] = useState<string>('off');
+  const [mockList, setMockList] = useState<MockOption[]>([]);
+
+  // 加载 mock 列表
+  useEffect(() => {
+    fetch('/api/mocks')
+      .then((r) => r.json())
+      .then((data) => setMockList(data))
+      .catch(() => setMockList([]));
+  }, []);
+
+  // ✅ 切换 mock 时自动填充输入框
+  const handleMockChange = (value: string) => {
+    setMockName(value);
+    if (value === 'off') {
+      setInput('');
+      return;
+    }
+    const selected = mockList.find((m) => m.name === value);
+    if (selected) {
+      setInput(selected.input);
+    }
+  };
+
+  const { messages, input, handleInputChange, handleSubmit, isLoading, stop, setInput } = useChat({
     api: '/api/chat',
-    initialMessages: generateLongHistory(50),
     experimental_throttle: 50,
+    body: { mockName: mockName === 'off' ? null : mockName },
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -18,30 +48,119 @@ function ChatContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // 🔍 调试：打印最后一条消息的结构
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last) return;
+    console.log('========== 调试信息 ==========');
+    console.log('[role]', last.role);
+    console.log('[parts]', JSON.stringify(last.parts, null, 2));
+    console.log('[data]', JSON.stringify((last as any).data, null, 2));
+    console.log('==============================');
+  }, [messages]);
+
   return (
-    <div className="flex flex-col h-screen max-w-3xl mx-auto">
-      <header className="p-4 border-b">
+    <div className="flex flex-col h-dvh max-w-3xl mx-auto">
+      <header className="p-4 border-b flex justify-between items-center gap-4">
         <h1 className="text-xl font-bold">滴滴 AI 出行助手</h1>
+
+        {/* ✅ Mock 下拉选择 */}
+        <select
+          value={mockName}
+          onChange={(e) => handleMockChange(e.target.value)}
+          className={`px-3 py-1.5 rounded-lg text-sm border ${
+            mockName === 'off'
+              ? 'bg-gray-50 text-gray-600 border-gray-300'
+              : 'bg-yellow-50 text-yellow-700 border-yellow-300'
+          }`}
+        >
+          <option value="off">🌐 真实 API</option>
+          {mockList.map((m) => (
+            <option key={m.name} value={m.name}>
+              🧪 {m.name}
+            </option>
+          ))}
+        </select>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message, index) => (
-          <div
-            key={message.id}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg p-3 ${
-                message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100'
-              }`}
-            >
-              <StreamingMessage
-                content={message.content}
-                isStreaming={isLoading && index === messages.length - 1}
-              />
-            </div>
+        {messages.length === 0 ? (
+          <div className="text-center text-gray-400 mt-20">
+            <p className="text-lg mb-2">👋 你好，我是滴滴 AI 出行助手</p>
+            <p className="text-sm">
+              {mockName === 'off'
+                ? '试试问："我要从北京去天津"'
+                : `当前 Mock: ${mockName}`}
+            </p>
           </div>
-        ))}
+        ) : (
+          messages.map((message, index) => {
+            const isLastMessage = index === messages.length - 1;
+            const isStreamingThis = isLoading && isLastMessage;
+
+            return (
+              <div
+                key={message.id}
+                className={`flex ${
+                  message.role === 'user' ? 'justify-end' : 'justify-start'
+                }`}
+              >
+                <div className="max-w-[85%] w-full space-y-2">
+                  {message.parts?.map((part: any, partIndex: number) => {
+                    // 思考过程
+                    if (part.type === 'reasoning') {
+                      return (
+                        <ThinkingCard
+                          key={`${message.id}-r-${partIndex}`}
+                          content={part.text ?? part.reasoning ?? ''}
+                          isStreaming={isStreamingThis}
+                        />
+                      );
+                    }
+
+                    // 工具调用
+                    if (part.type === 'tool-invocation') {
+                      return (
+                        <ToolCallCard
+                          key={part.toolInvocation.toolCallId}
+                          toolName={part.toolInvocation.toolName}
+                          args={part.toolInvocation.args}
+                          state={part.toolInvocation.state}
+                          result={
+                            'result' in part.toolInvocation
+                              ? part.toolInvocation.result
+                              : undefined
+                          }
+                        />
+                      );
+                    }
+
+                    // 文本
+                    if (part.type === 'text' && part.text) {
+                      return (
+                        <div
+                          key={`${message.id}-t-${partIndex}`}
+                          className={`inline-block rounded-lg p-3 ${
+                            message.role === 'user'
+                              ? 'bg-blue-500 text-white float-right'
+                              : 'bg-gray-100'
+                          }`}
+                        >
+                          <StreamingMessage
+                            content={part.text}
+                            isStreaming={isStreamingThis}
+                          />
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })}
+                </div>
+              </div>
+            );
+          })
+        )}
         <div ref={messagesEndRef} />
       </div>
 
