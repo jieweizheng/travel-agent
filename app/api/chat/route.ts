@@ -10,6 +10,12 @@ interface MockItem {
   name: string;
   text: string;
   reasoning?: string;
+  retrieval?: Array<{
+    content: string;
+    score: number;
+    source: string;
+    highlights: string[];
+  }>;
 }
 
 async function loadMocks(): Promise<MockItem[]> {
@@ -22,7 +28,7 @@ async function loadMocks(): Promise<MockItem[]> {
 }
 
 // 构造阿里云格式的 SSE（AI SDK 会解析 reasoning_content 和 content）
-function buildMockSSE(item: MockItem): Response {
+function buildMockSSE(item: MockItem, enableThinking: boolean): Response {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
@@ -40,8 +46,15 @@ function buildMockSSE(item: MockItem): Response {
         );
       };
 
+      // ✅ 新增：先发检索数据（用 \u2063 不可见标记包裹）
+      if (item.retrieval) {
+        const marker = `\u2063RETRIEVAL\u2063${JSON.stringify(item.retrieval)}\u2063`;
+        send({ content: marker });
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
       // 逐字发送 reasoning
-      if (item.reasoning) {
+      if (enableThinking && item.reasoning) {
         for (const char of item.reasoning) {
           send({ reasoning_content: char });
           await new Promise((r) => setTimeout(r, 15));
@@ -64,7 +77,7 @@ function buildMockSSE(item: MockItem): Response {
   });
 }
 
-function createAliyunProvider(mockItem: MockItem | null) {
+function createAliyunProvider(mockItem: MockItem | null, enableThinking: boolean) {
   return createOpenAICompatible({
     name: 'aliyun',
     apiKey: process.env.OPENAI_API_KEY,
@@ -72,15 +85,17 @@ function createAliyunProvider(mockItem: MockItem | null) {
     fetch: async (url, options) => {
       // 有 mock 就用 mock
       if (mockItem) {
-        console.log(`[Mock] 回放: ${mockItem.name}`);
-        return buildMockSSE(mockItem);
+        console.log(`[Mock] 回放: ${mockItem.name}, thinking=${enableThinking}`);
+        return buildMockSSE(mockItem, enableThinking);
       }
 
       // 真实请求：注入 thinking 参数
       if (options?.body) {
         const body = JSON.parse(options.body as string);
-        body.enable_thinking = true;
-        body.incremental_output = true;
+        if (enableThinking) {
+          body.enable_thinking = true;
+          body.incremental_output = true;
+        }
         options.body = JSON.stringify(body);
       }
       return fetch(url, options);
@@ -91,8 +106,8 @@ function createAliyunProvider(mockItem: MockItem | null) {
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  const { messages, mockName } = await req.json();
-  console.log(`[Request] mockName = ${mockName ?? '(真实API)'}`);
+  const { messages, mockName, enableThinking = true } = await req.json();
+  console.log(`[Request] mockName=${mockName ?? '真实API'}, thinking=${enableThinking}`);
 
   // 根据前端传来的 mockName 查找对应 mock
   let mockItem: MockItem | null = null;
@@ -104,12 +119,17 @@ export async function POST(req: Request) {
     }
   }
 
-  const aliyun = createAliyunProvider(mockItem);
+  const aliyun = createAliyunProvider(mockItem, enableThinking);
 
   const result = await streamText({
     model: aliyun('qwen-plus'),
     system: '你是一个智能出行助手。请详细推导各种可能的出行方案。',
     messages,
+    maxSteps: 5,
+    onStepFinish({ toolCalls, toolResults }){
+      console.log('[Step] 工具调用:', JSON.stringify(toolCalls, null, 2));
+      console.log('[Step] 工具结果:', toolResults?.length);
+    },
     tools: {
       getTraffic: tool({
         description: '查询两个地点之间的实时路况',
@@ -133,5 +153,5 @@ export async function POST(req: Request) {
     },
   });
 
-  return result.toDataStreamResponse({ sendReasoning: true });
+  return result.toDataStreamResponse({ sendReasoning: enableThinking });
 }

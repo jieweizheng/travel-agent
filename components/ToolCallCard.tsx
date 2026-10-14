@@ -12,7 +12,7 @@ interface ToolCallCardProps {
 
 const TOOL_LABELS: Record<string, string> = {
   getTraffic: '查询实时路况',
-  getWeather: '查询目的地天气',
+  getWeather: '查询城市天气',
 };
 
 export function ToolCallCard({ toolName, args, state, result }: ToolCallCardProps) {
@@ -37,6 +37,11 @@ export function ToolCallCard({ toolName, args, state, result }: ToolCallCardProp
         <span className="font-medium text-sm">
           {TOOL_LABELS[toolName] || toolName}
         </span>
+        {Object.keys(args).length > 0 && (
+        <span className="text-xs text-gray-500 truncate max-w-[200px]">
+            {Object.values(args).join(' → ')}
+        </span>
+        )}
 
         <span className="text-xs text-gray-500 ml-auto">
           {isRunning ? '执行中...' : isSuccess ? '已完成' : '失败'}

@@ -5,6 +5,7 @@ import { useRef, useEffect, useState, Suspense } from 'react';
 import { StreamingMessage } from '@/components/StreamingMessage';
 import { ToolCallCard } from '@/components/ToolCallCard';
 import { ThinkingCard } from '@/components/ThinkingCard';
+import { MessageContent } from '@/components/MessageContent';
 
 interface MockOption {
   name: string;
@@ -12,6 +13,7 @@ interface MockOption {
 }
 
 function ChatContent() {
+  const [enableThinking, setEnableThinking] = useState(false);  // 默认开启
   const [mockName, setMockName] = useState<string>('off');
   const [mockList, setMockList] = useState<MockOption[]>([]);
 
@@ -39,9 +41,12 @@ function ChatContent() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop, setInput } = useChat({
     api: '/api/chat',
     experimental_throttle: 50,
-    body: { mockName: mockName === 'off' ? null : mockName },
+    body: {
+      mockName: mockName === 'off' ? null : mockName,
+      enableThinking
+    },
   });
-
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,17 +57,27 @@ function ChatContent() {
   useEffect(() => {
     const last = messages[messages.length - 1];
     if (!last) return;
-    console.log('========== 调试信息 ==========');
-    console.log('[role]', last.role);
     console.log('[parts]', JSON.stringify(last.parts, null, 2));
     console.log('[data]', JSON.stringify((last as any).data, null, 2));
-    console.log('==============================');
   }, [messages]);
 
   return (
     <div className="flex flex-col h-dvh max-w-3xl mx-auto">
       <header className="p-4 border-b flex justify-between items-center gap-4">
-        <h1 className="text-xl font-bold">滴滴 AI 出行助手</h1>
+        <h1 className="text-xl font-bold">出行助手</h1>
+
+         {/* 思考模式开关 */}
+        <button
+          onClick={() => setEnableThinking(!enableThinking)}
+          className={`px-3 py-1.5 rounded-lg text-sm border transition ${
+            enableThinking
+              ? 'bg-purple-50 text-purple-700 border-purple-300'
+              : 'bg-gray-50 text-gray-500 border-gray-300'
+          }`}
+          title={enableThinking ? '思考模式已开启' : '思考模式已关闭'}
+        >
+          🧠 {enableThinking ? '思考' : '不思考'}
+        </button>
 
         {/* ✅ Mock 下拉选择 */}
         <select
@@ -140,16 +155,11 @@ function ChatContent() {
                       return (
                         <div
                           key={`${message.id}-t-${partIndex}`}
-                          className={`inline-block rounded-lg p-3 ${
-                            message.role === 'user'
-                              ? 'bg-blue-500 text-white float-right'
-                              : 'bg-gray-100'
+                          className={`rounded-lg p-3 w-fit ${
+                            message.role === 'user' ? 'bg-blue-500 text-white ml-auto' : 'bg-gray-100 mr-auto'
                           }`}
                         >
-                          <StreamingMessage
-                            content={part.text}
-                            isStreaming={isStreamingThis}
-                          />
+                          <MessageContent content={part.text} />
                         </div>
                       );
                     }
