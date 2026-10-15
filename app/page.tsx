@@ -100,13 +100,29 @@ function ChatContent() {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-400 mt-20">
-            <p className="text-lg mb-2">👋 你好，我是滴滴 AI 出行助手</p>
-            <p className="text-sm">
-              {mockName === 'off'
-                ? '试试问："我要从北京去天津"'
-                : `当前 Mock: ${mockName}`}
+          <div className="text-center text-gray-600 mt-20 max-w-xl mx-auto px-4">
+            <p className="text-lg font-medium text-gray-800 mb-2">👋 你好，我是 AI 出行助手</p>
+            <p className="text-sm leading-6">
+              我可以帮你规划出行思路，并查询路线和天气。需要实时信息时，我可以调用百度地图驾车路线工具，查询起终点之间的路线、预计耗时、距离和路况；也可以调用 Open-Meteo 天气工具，查询城市当前天气、气温、体感温度、湿度、降水和风速。
             </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {[
+                '查询北京到天津的驾车路线和路况',
+                '查询上海当前天气',
+              ].map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => setInput(example)}
+                  className="rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-800 transition hover:bg-green-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
+            {mockName !== 'off' && (
+              <p className="text-sm text-gray-500 mt-3">当前为 Mock 演示模式：{mockName}</p>
+            )}
           </div>
         ) : (
           messages.map((message, index) => {
@@ -156,7 +172,9 @@ function ChatContent() {
                         <div
                           key={`${message.id}-t-${partIndex}`}
                           className={`rounded-lg p-3 w-fit ${
-                            message.role === 'user' ? 'bg-blue-500 text-white ml-auto' : 'bg-gray-100 mr-auto'
+                            message.role === 'user'
+                              ? 'bg-[#95ec69] text-[#17351e] ml-auto'
+                              : 'bg-[#f1f2f3] text-[#1f2329] mr-auto'
                           }`}
                         >
                           <MessageContent content={part.text} />

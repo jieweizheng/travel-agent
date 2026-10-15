@@ -30,7 +30,7 @@ export function MessageContent({ content }: MessageContentProps) {
     <div>
       {retrievalData && <RetrievalCard results={retrievalData} />}
       {!hasIncompleteMarker && (
-        <div className="prose prose-sm max-w-none">
+        <div className="prose prose-sm max-w-none prose-p:text-current prose-headings:text-current prose-strong:text-current prose-li:text-current">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}

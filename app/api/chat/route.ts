@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { getCurrentWeather } from '@/lib/weather';
+import { getDrivingTraffic } from '@/lib/traffic';
 
 const MOCK_FILE = path.join(process.cwd(), 'data/mocks.json');
 
@@ -124,7 +125,7 @@ export async function POST(req: Request) {
 
   const result = await streamText({
     model: aliyun('qwen-plus'),
-    system: '你是一个智能出行助手。请详细推导各种可能的出行方案。',
+    system: '你是 AI 出行助手，帮助用户规划出行并解答路线和天气问题。用户询问驾车路线、距离、耗时或路况时，必须调用 getTraffic 获取百度地图结果；询问当前天气时，必须调用 getWeather 获取 Open-Meteo 结果。只根据工具返回的数据陈述实时信息；工具失败或没有返回某项数据时，明确说明无法获取，不要编造。可以基于用户提供的信息给出出行建议，并清楚区分建议与实时查询结果。',
     messages,
     maxSteps: 5,
     onStepFinish({ toolCalls, toolResults }){
@@ -138,10 +139,7 @@ export async function POST(req: Request) {
           from: z.string().describe('出发地'),
           to: z.string().describe('目的地'),
         }),
-        execute: async ({ from, to }) => {
-          await new Promise((r) => setTimeout(r, 800));
-          return { from, to, congestion: 'moderate', estimatedTime: 25, distance: '12km' };
-        },
+        execute: async ({ from, to }) => getDrivingTraffic(from, to),
       }),
       getWeather: tool({
         description: '查询某个城市的天气',
