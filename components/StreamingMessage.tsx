@@ -1,31 +1,23 @@
 'use client';
 
-import { Streamdown } from 'streamdown';
-import { memo } from 'react';
-
-const MemoParagraph = memo(function Paragraph({ text }: { text: string }) {
-  return <Streamdown>{text}</Streamdown>;
-});
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 
 interface StreamingMessageProps {
   content: string;
   isStreaming: boolean;
 }
 
-export function StreamingMessage({ content, isStreaming }: StreamingMessageProps) {
-  if (!isStreaming) {
-    return <Streamdown>{content}</Streamdown>;
-  }
-
-  const paragraphs = content.split('\n\n');
-  const lastParagraph = paragraphs.pop() || '';
-
+export function StreamingMessage({ content }: StreamingMessageProps) {
   return (
-    <div>
-      {paragraphs.map((p, i) => (
-        <MemoParagraph key={i} text={p} />
-      ))}
-      <Streamdown>{lastParagraph}</Streamdown>
+    <div className="prose prose-sm max-w-none">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

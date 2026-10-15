@@ -1,5 +1,8 @@
 'use client';
 
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import { RetrievalCard, RetrievalItem } from './RetrievalCard';
 
 interface MessageContentProps {
@@ -20,7 +23,6 @@ export function MessageContent({ content }: MessageContentProps) {
     }
   }
 
-  // 流式中标记不完整时，暂时不显示正文，避免闪烁
   const hasIncompleteMarker =
     !match && content.includes('\u2063RETRIEVAL\u2063');
 
@@ -28,7 +30,14 @@ export function MessageContent({ content }: MessageContentProps) {
     <div>
       {retrievalData && <RetrievalCard results={retrievalData} />}
       {!hasIncompleteMarker && (
-        <div className="whitespace-pre-wrap leading-relaxed">{textContent}</div>
+        <div className="prose prose-sm max-w-none">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeHighlight]}
+          >
+            {textContent}
+          </ReactMarkdown>
+        </div>
       )}
     </div>
   );
