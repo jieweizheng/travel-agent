@@ -3,6 +3,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { z } from 'zod';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { getCurrentWeather } from '@/lib/weather';
 
 const MOCK_FILE = path.join(process.cwd(), 'data/mocks.json');
 
@@ -145,10 +146,7 @@ export async function POST(req: Request) {
       getWeather: tool({
         description: '查询某个城市的天气',
         parameters: z.object({ city: z.string().describe('城市名') }),
-        execute: async ({ city }) => {
-          await new Promise((r) => setTimeout(r, 500));
-          return { city, weather: '晴', temperature: 22 };
-        },
+        execute: async ({ city }) => getCurrentWeather(city),
       }),
     },
   });
